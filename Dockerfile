@@ -4,11 +4,21 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
+# Install build dependencies
+RUN apk add --no-cache --virtual .build-deps \
+    python3 \
+    make \
+    g++ \
+    libc6-compat
+
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
+
+# Clean up build dependencies
+RUN apk del .build-deps
 
 # Copy source code
 COPY . .
