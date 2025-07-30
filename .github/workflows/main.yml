@@ -1,0 +1,250 @@
+name: CI/CD Pipeline for Dental Office Backend
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_BACKEND: dental-office/backend
+  EKS_CLUSTER_NAME: xavier-dental-cluster
+
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+      
+    - name: Set ECR Registry URL and image tag
+      run: |
+        echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
+        echo "IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+      
+    - name: Create ECR repository if it doesn't exist
+      run: |
+        aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_BACKEND }} || aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY_BACKEND }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build and push Backend Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ env.IMAGE_TAG }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Update Kubernetes manifest
+      run: |
+        # Create k8s directory if it doesn't exist
+        mkdir -p k8s
+        
+        # Create or update Kubernetes manifest
+        cat > k8s/backend-app.yaml << EOF
+        ---
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: dental-app
+        ---
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          namespace: dental-app
+          name: backend-config
+        data:
+          NODE_ENV: "production"
+          PORT: "5000"
+          FRONTEND_URL: "http://frontend-service"
+          LOG_LEVEL: "info"
+        ---
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          namespace: dental-app
+          name: backend-secrets
+        type: Opaque
+        stringData:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        ---
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          namespace: dental-app
+          name: backend-deployment
+          annotations:
+            kubernetes.io/change-cause: "Image updated to ${{ env.IMAGE_TAG }} by GitHub Actions"
+        spec:
+          selector:
+            matchLabels:
+              app: dental-backend
+          replicas: 1
+          strategy:
+            type: Recreate
+          template:
+            metadata:
+              labels:
+                app: dental-backend
+                version: "${{ env.IMAGE_TAG }}"
+            spec:
+              containers:
+              - image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ env.IMAGE_TAG }}
+                imagePullPolicy: Always
+                name: backend
+                ports:
+                - containerPort: 5000
+                envFrom:
+                - configMapRef:
+                    name: backend-config
+                - secretRef:
+                    name: backend-secrets
+                resources:
+                  requests:
+                    memory: "256Mi"
+                    cpu: "100m"
+                  limits:
+                    memory: "512Mi"
+                    cpu: "500m"
+              # Fargate requires setting these security contexts
+              securityContext:
+                fsGroup: 65534
+                runAsUser: 10000
+                runAsGroup: 10000
+                runAsNonRoot: true
+        ---
+        apiVersion: v1
+        kind: Service
+        metadata:
+          namespace: dental-app
+          name: backend-service
+        spec:
+          ports:
+            - port: 80
+              targetPort: 5000
+              protocol: TCP
+          type: ClusterIP
+          selector:
+            app: dental-backend
+        ---
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          namespace: dental-app
+          name: dental-app-ingress
+          annotations:
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            alb.ingress.kubernetes.io/target-type: ip
+            alb.ingress.kubernetes.io/healthcheck-path: /health
+            alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+            alb.ingress.kubernetes.io/cors-allow-headers: "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+            alb.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+            alb.ingress.kubernetes.io/cors-allow-origin: "*"
+            alb.ingress.kubernetes.io/subnets: auto-discover
+            alb.ingress.kubernetes.io/tags: Environment=production,Application=dental-office
+        spec:
+          ingressClassName: alb
+          rules:
+          - http:
+              paths:
+              - path: /api
+                pathType: Prefix
+                backend:
+                  service:
+                    name: backend-service
+                    port:
+                      number: 80
+              - path: /health
+                pathType: Exact
+                backend:
+                  service:
+                    name: backend-service
+                    port:
+                      number: 80
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: frontend-service
+                    port:
+                      number: 80
+        EOF
+
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+        kubectl version --client
+        
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+      
+    - name: Deploy to EKS
+      run: |
+        # Apply namespace, configmap and secret first
+        kubectl apply -f k8s/backend-app.yaml -l '!app'
+        
+        # Delete the old deployment if it exists (for clean deployment)
+        kubectl delete deployment backend-deployment -n dental-app --ignore-not-found=true
+        
+        # Apply the new deployment
+        kubectl apply -f k8s/backend-app.yaml
+        
+    - name: Verify deployment
+      run: |
+        # Wait for the deployment to be ready with a timeout
+        kubectl rollout status deployment/backend-deployment -n dental-app --timeout=90s
+        
+        # Get pod status
+        echo "Pod status:"
+        kubectl get pods -n dental-app
+        
+        # Get pod logs if available
+        echo "Pod logs:"
+        POD_NAME=$(kubectl get pods -n dental-app -l app=dental-backend -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$POD_NAME" ]; then
+          kubectl logs -n dental-app $POD_NAME --tail=50
+        else
+          echo "No pods found yet"
+        fi
+        
+    - name: Get Ingress URL
+      run: |
+        echo "Waiting for ingress to get an address..."
+        for i in {1..30}; do
+          INGRESS_HOST=$(kubectl get ingress backend-ingress -n dental-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          if [ -n "$INGRESS_HOST" ]; then
+            echo "✅ Backend API is available at: http://$INGRESS_HOST"
+            echo "BACKEND_URL=http://$INGRESS_HOST" >> $GITHUB_ENV
+            break
+          fi
+          echo "Waiting for ingress address... (attempt $i/30)"
+          sleep 10
+        done
+        
+        if [ -z "$INGRESS_HOST" ]; then
+          echo "⚠️ Ingress did not receive an address within the timeout period."
+          echo "Check the ingress status manually:"
+          kubectl get ingress -n dental-app
+        fi
+
