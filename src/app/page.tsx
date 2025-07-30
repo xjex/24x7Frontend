@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Calendar, Clock, Users, Award, Phone, MapPin } from "lucide-react"
@@ -125,7 +125,7 @@ export default function Home() {
             <div className="pretty-card p-8">
               <h3 className="text-xl font-semibold mb-4 text-foreground">Emergency Care Available</h3>
               <p className="text-muted-foreground mb-4">
-                Dental emergencies don't wait for business hours. We offer same-day emergency 
+                Dental emergencies don&apos;t wait for business hours. We offer same-day emergency 
                 appointments for urgent dental needs.
               </p>
               <Button variant="outline">Learn More</Button>
@@ -136,7 +136,7 @@ export default function Home() {
 
       <footer className="bg-gray-900 dark:bg-gray-950 text-white py-8">
         <div className="container mx-auto px-4 text-center">
-          <p className="text-gray-300 dark:text-gray-200">&copy; 2024 DentalCare+. All rights reserved. Xavier's Demo for 24x7 </p>
+          <p className="text-gray-300 dark:text-gray-200">&copy; 2024 DentalCare+. All rights reserved. Xavier&apos;s Demo for 24x7 </p>
         </div>
       </footer>
     </div>

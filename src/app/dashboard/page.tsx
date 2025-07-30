@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppointmentStore } from '@/stores/appointmentStore'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Calendar, Clock, User, Phone, Mail, MapPin, Plus, Edit, Trash2, LogOut } from 'lucide-react'
 import { format } from 'date-fns'
@@ -15,7 +15,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { user, logout, isAuthenticated } = useAuthStore()
   const { appointments, fetchAppointments, cancelAppointment, isLoading } = useAppointmentStore()
-  const [selectedAppointment, setSelectedAppointment] = useState<string | null>(null)
+
 
   useEffect(() => {
     if (!isAuthenticated) {

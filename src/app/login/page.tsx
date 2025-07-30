@@ -29,8 +29,8 @@ export default function LoginPage() {
       setError('')
       await login(data.email, data.password)
       router.push('/dashboard')
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.')
+    } catch (err: unknown) {
+      setError((err as {response?: {data?: {message?: string}}})?.response?.data?.message || 'Login failed. Please try again.')
     }
   }
 
@@ -121,7 +121,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-8 text-center">
-            <span className="text-muted-foreground">Don't have an account? </span>
+                            <span className="text-muted-foreground">Don&apos;t have an account? </span>
             <Link href="/register" className="text-dental-600 hover:text-dental-700 font-medium">
               Sign up here
             </Link>

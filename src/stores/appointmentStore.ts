@@ -32,7 +32,7 @@ interface AppointmentState {
   rescheduleAppointment: (appointmentId: string, newDate: string, newTime: string) => Promise<void>
 }
 
-export const useAppointmentStore = create<AppointmentState>((set, get) => ({
+export const useAppointmentStore = create<AppointmentState>((set) => ({
   appointments: [],
   dentists: [],
   isLoading: false,

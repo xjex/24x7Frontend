@@ -55,8 +55,8 @@ export default function RegisterPage() {
         emergencyContact: data.emergencyContact
       })
       router.push('/dashboard')
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.')
+    } catch (err: unknown) {
+      setError((err as {response?: {data?: {message?: string}}})?.response?.data?.message || 'Registration failed. Please try again.')
     }
   }
 

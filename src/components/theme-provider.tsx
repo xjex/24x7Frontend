@@ -30,9 +30,7 @@ export function ThemeProvider({
   children,
   defaultTheme = "light",
   storageKey = "dental-ui-theme",
-  attribute = "class",
   enableSystem = true,
-  disableTransitionOnChange = true,
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme)
@@ -52,7 +50,7 @@ export function ThemeProvider({
       root.classList.remove("light", "dark")
       root.classList.add(initialTheme)
     }
-  }, [])
+  }, [defaultTheme, storageKey])
 
   useEffect(() => {
     if (!mounted) return

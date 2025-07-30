@@ -7,12 +7,10 @@ import { useForm } from 'react-hook-form'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppointmentStore } from '@/stores/appointmentStore'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Calendar, Clock, User, ArrowLeft, Check } from 'lucide-react'
-import { format, addDays, isBefore, isWeekend, isToday } from 'date-fns'
+import { Clock, User, ArrowLeft, Check } from 'lucide-react'
+import { format, addDays, isWeekend } from 'date-fns'
 
 interface BookingForm {
   dentistId: string
@@ -49,7 +47,7 @@ export default function BookingPage() {
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<BookingForm>()
+  const { register, handleSubmit, setValue } = useForm<BookingForm>()
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -70,7 +68,7 @@ export default function BookingPage() {
     return dates
   }
 
-  const isTimeSlotAvailable = (time: string) => {
+  const isTimeSlotAvailable = (_: string) => {
     return true
   }
 
