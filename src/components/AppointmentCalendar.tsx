@@ -20,6 +20,18 @@ interface AvailabilityDay {
   }>
 }
 
+interface ApiTimeSlot {
+  time24: string
+  time12: string
+  isAvailable: boolean
+  isBooked: boolean
+}
+
+interface ApiAvailabilityDay {
+  date: string
+  timeSlots: ApiTimeSlot[]
+}
+
 interface AppointmentCalendarProps {
   dentistId: string
   selectedDate?: Date
@@ -29,6 +41,10 @@ interface AppointmentCalendarProps {
 
 // Helper function to convert 24-hour time to 12-hour format
 const convertTo12HourFormat = (time24: string): string => {
+  if (!time24 || typeof time24 !== 'string') {
+    return 'Invalid time'
+  }
+  
   const [hours, minutes] = time24.split(':').map(Number)
   const period = hours >= 12 ? 'PM' : 'AM'
   const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
@@ -52,8 +68,8 @@ export function AppointmentCalendar({
       const startDate = format(new Date(), 'yyyy-MM-dd')
       const endDate = format(addDays(new Date(), 30), 'yyyy-MM-dd')
       const data = await fetchDoctorAvailability(dentistId, startDate, endDate)
-      const transformedData: AvailabilityDay[] = data.map(day => {
-        const availableSlots = day.timeSlots.filter(slot => slot.available).length
+      const transformedData: AvailabilityDay[] = (data as unknown as ApiAvailabilityDay[]).map(day => {
+        const availableSlots = day.timeSlots.filter(slot => slot.isAvailable).length
         const totalSlots = day.timeSlots.length
         
         // Handle case where no time slots exist (unavailable day)
@@ -74,10 +90,10 @@ export function AppointmentCalendar({
           availableSlots,
           totalSlots,
           timeSlots: day.timeSlots.map(slot => ({
-            time24: slot.time,
-            time12: convertTo12HourFormat(slot.time),
-            isAvailable: slot.available,
-            isBooked: !slot.available
+            time24: slot.time24,
+            time12: slot.time12,
+            isAvailable: slot.isAvailable,
+            isBooked: slot.isBooked
           }))
         }
       })
