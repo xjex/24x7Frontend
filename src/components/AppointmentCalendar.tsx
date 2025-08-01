@@ -27,6 +27,14 @@ interface AppointmentCalendarProps {
   onTimeSelect: (timeSlot: { time24: string; time12: string }) => void
 }
 
+// Helper function to convert 24-hour time to 12-hour format
+const convertTo12HourFormat = (time24: string): string => {
+  const [hours, minutes] = time24.split(':').map(Number)
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
+}
+
 export function AppointmentCalendar({ 
   dentistId, 
   selectedDate, 
@@ -47,17 +55,27 @@ export function AppointmentCalendar({
       const transformedData: AvailabilityDay[] = data.map(day => {
         const availableSlots = day.timeSlots.filter(slot => slot.available).length
         const totalSlots = day.timeSlots.length
-        const status = availableSlots === 0 ? 'fully-booked' : 
-                      availableSlots < totalSlots / 2 ? 'limited' : 'available'
+        
+        // Handle case where no time slots exist (unavailable day)
+        let status: 'available' | 'limited' | 'fully-booked' | 'unavailable'
+        if (totalSlots === 0) {
+          status = 'unavailable'
+        } else if (availableSlots === 0) {
+          status = 'fully-booked'
+        } else if (availableSlots < totalSlots / 2) {
+          status = 'limited'
+        } else {
+          status = 'available'
+        }
         
         return {
           date: day.date,
-          status: status as 'available' | 'limited' | 'fully-booked' | 'unavailable',
+          status,
           availableSlots,
           totalSlots,
           timeSlots: day.timeSlots.map(slot => ({
             time24: slot.time,
-            time12: slot.time, // You may want to convert this to 12-hour format
+            time12: convertTo12HourFormat(slot.time),
             isAvailable: slot.available,
             isBooked: !slot.available
           }))
@@ -103,13 +121,14 @@ export function AppointmentCalendar({
 
 
   const isDateDisabled = (date: Date) => {
- 
-    if (date < new Date()) {
-      return true
-    }
+    // Only disable past dates
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
     
-    const availability = getDateAvailability(date)
-    return availability?.status === 'unavailable' || availability?.status === 'fully-booked'
+    const checkDate = new Date(date)
+    checkDate.setHours(0, 0, 0, 0)
+    
+    return checkDate < today
   }
 
   const availableTimeSlots = getAvailableTimeSlots()
@@ -209,11 +228,17 @@ export function AppointmentCalendar({
         </div>
       )}
 
-          {selectedDate && availableTimeSlots.length === 0 && selectedDateAvailability?.status !== 'unavailable' && (
-            <div className="text-center py-4">
-              <p className="text-muted-foreground">No available time slots for this date</p>
-            </div>
+      {selectedDate && availableTimeSlots.length === 0 && (
+        <div className="text-center py-4 space-y-2">
+          <p className="text-muted-foreground">No available time slots for this date</p>
+          {selectedDateAvailability?.status === 'unavailable' && (
+            <p className="text-sm text-red-600">Dentist is not available on this day</p>
           )}
+          {!selectedDateAvailability && (
+            <p className="text-sm text-orange-600">Working hours not configured for this dentist</p>
+          )}
+        </div>
+      )}
         </>
       )}
     </div>

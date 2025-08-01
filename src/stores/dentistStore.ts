@@ -83,6 +83,16 @@ export interface ChangePasswordData {
   newPassword: string;
 }
 
+export interface WorkingHours {
+  monday: { start: string; end: string; isWorking: boolean };
+  tuesday: { start: string; end: string; isWorking: boolean };
+  wednesday: { start: string; end: string; isWorking: boolean };
+  thursday: { start: string; end: string; isWorking: boolean };
+  friday: { start: string; end: string; isWorking: boolean };
+  saturday: { start: string; end: string; isWorking: boolean };
+  sunday: { start: string; end: string; isWorking: boolean };
+}
+
 interface DentistState {
   profile: DentistProfile | null;
   patients: Patient[];
@@ -268,6 +278,46 @@ export const useDentistStore = create<DentistState>((set, get) => ({
     } catch (error) {
       console.error('Failed to fetch services:', error);
       set({ services: [] });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // Working Hours Management
+  fetchWorkingHours: async () => {
+    try {
+      set({ isLoading: true });
+      const response = await api.get('/dentists/working-hours');
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to fetch working hours:', error);
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateWorkingHours: async (workingHours: WorkingHours) => {
+    try {
+      set({ isLoading: true });
+      await api.put('/dentists/working-hours', { workingHours });
+      // Refresh profile to get updated working hours
+      await get().fetchProfile();
+    } catch (error) {
+      console.error('Failed to update working hours:', error);
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateDayAvailability: async (date: string, timeSlots: Array<{start: string, end: string, isAvailable: boolean}>) => {
+    try {
+      set({ isLoading: true });
+      await api.put('/dentists/availability', { date, timeSlots });
+    } catch (error) {
+      console.error('Failed to update day availability:', error);
+      throw error;
     } finally {
       set({ isLoading: false });
     }

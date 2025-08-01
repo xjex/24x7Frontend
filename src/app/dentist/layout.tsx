@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/sidebar'
 import {
   Calendar, Users, User, Settings, LogOut, LayoutDashboard, 
-  CalendarDays, Stethoscope, FileText
+  CalendarDays, Stethoscope, FileText, Clock
 } from 'lucide-react'
 
 interface DentistLayoutProps {
@@ -50,6 +50,7 @@ function DentistSidebar() {
     { href: '/dentist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dentist/appointments', label: 'Appointments', icon: Calendar },
     { href: '/dentist/schedule', label: 'Schedule Management', icon: CalendarDays },
+    { href: '/dentist/working-hours', label: 'Working Hours', icon: Clock },
     { href: '/dentist/patients', label: 'My Patients', icon: Users },
     { href: '/dentist/services', label: 'My Services', icon: Stethoscope },
     { href: '/dentist/reports', label: 'Reports', icon: FileText },

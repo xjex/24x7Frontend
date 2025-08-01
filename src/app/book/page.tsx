@@ -24,6 +24,7 @@ import {
 import { format } from 'date-fns'
 import { AppointmentCalendar } from '@/components/AppointmentCalendar'
 
+
 interface GuestBookingData {
   dentistId: string
   serviceId: string
