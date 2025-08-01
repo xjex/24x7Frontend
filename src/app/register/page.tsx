@@ -3,14 +3,15 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import { ThemeToggle } from '@/components/theme-toggle'
-import { ArrowLeft, Mail, Lock, User, Phone, Calendar, MapPin, UserCheck, Check } from 'lucide-react'
+import { ArrowLeft, Mail, Lock, User, Phone, Calendar, MapPin, UserCheck, Check, Eye, EyeOff } from 'lucide-react'
 
 interface RegisterForm {
   firstName: string
@@ -20,6 +21,7 @@ interface RegisterForm {
   password: string
   confirmPassword: string
   dateOfBirth: string
+  gender: string
   address: {
     street: string
     city: string
@@ -38,13 +40,15 @@ export default function RegisterPage() {
   const { register: registerUser, isLoading } = useAuthStore()
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
-  const { register, handleSubmit, formState: { errors }, watch, trigger } = useForm<RegisterForm>()
+  const { register, handleSubmit, formState: { errors }, watch, trigger, control } = useForm<RegisterForm>()
   const password = watch('password')
   const formValues = watch()
 
   const validateStep1 = async () => {
-    return await trigger(['firstName', 'lastName', 'email', 'phone', 'dateOfBirth'])
+    return await trigger(['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'gender'])
   }
 
   const validateStep2 = async () => {
@@ -70,7 +74,7 @@ export default function RegisterPage() {
         password: data.password,
         phone: data.phone,
         birthdate: data.dateOfBirth,
-        gender: 'not-specified',
+        gender: data.gender,
         address: `${data.address.street}, ${data.address.city}, ${data.address.state} ${data.address.zipCode}`
       })
       router.push('/dashboard')
@@ -79,7 +83,7 @@ export default function RegisterPage() {
     }
   }
 
-  const canProceedToStep2 = formValues.firstName && formValues.lastName && formValues.email && formValues.phone && formValues.dateOfBirth
+  const canProceedToStep2 = formValues.firstName && formValues.lastName && formValues.email && formValues.phone && formValues.dateOfBirth && formValues.gender
   const canProceedToStep3 = canProceedToStep2 && formValues.address?.street && formValues.address?.city && formValues.address?.state && formValues.address?.zipCode && formValues.emergencyContact?.name && formValues.emergencyContact?.phone && formValues.emergencyContact?.relationship
   const canSubmit = canProceedToStep3 && formValues.password && formValues.confirmPassword
 
@@ -250,6 +254,29 @@ export default function RegisterPage() {
                       </div>
                       {errors.dateOfBirth && <p className="text-sm text-red-600">{errors.dateOfBirth.message}</p>}
                     </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Gender</Label>
+                      <Controller
+                        name="gender"
+                        control={control}
+                        rules={{ required: 'Please select your gender' }}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your gender" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                              <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.gender && <p className="text-sm text-red-600">{errors.gender.message}</p>}
+                    </div>
                   </div>
                 </div>
 
@@ -405,9 +432,9 @@ export default function RegisterPage() {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="password"
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           placeholder="Create a password"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           {...register('password', {
                             required: 'Password is required',
                             minLength: { value: 8, message: 'Password must be at least 8 characters' },
@@ -417,8 +444,36 @@ export default function RegisterPage() {
                             }
                           })}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                       {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
+                      {password && (
+                        <div className="mt-2 space-y-1">
+                          <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Password Requirements:</div>
+                          <div className={`flex items-center gap-2 text-xs ${password.length >= 8 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {password.length >= 8 ? <Check className="h-3 w-3" /> : <span className="h-3 w-3 rounded-full border border-current"></span>}
+                            At least 8 characters
+                          </div>
+                          <div className={`flex items-center gap-2 text-xs ${/[A-Z]/.test(password) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {/[A-Z]/.test(password) ? <Check className="h-3 w-3" /> : <span className="h-3 w-3 rounded-full border border-current"></span>}
+                            One uppercase letter
+                          </div>
+                          <div className={`flex items-center gap-2 text-xs ${/[a-z]/.test(password) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {/[a-z]/.test(password) ? <Check className="h-3 w-3" /> : <span className="h-3 w-3 rounded-full border border-current"></span>}
+                            One lowercase letter
+                          </div>
+                          <div className={`flex items-center gap-2 text-xs ${/\d/.test(password) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {/\d/.test(password) ? <Check className="h-3 w-3" /> : <span className="h-3 w-3 rounded-full border border-current"></span>}
+                            One number
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -427,16 +482,37 @@ export default function RegisterPage() {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="confirmPassword"
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           placeholder="Confirm your password"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           {...register('confirmPassword', {
                             required: 'Please confirm your password',
                             validate: value => value === password || 'Passwords do not match'
                           })}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                       {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>}
+                      {formValues.confirmPassword && password && (
+                        <div className={`flex items-center gap-2 text-xs mt-2 ${
+                          formValues.confirmPassword === password 
+                            ? 'text-green-600 dark:text-green-400' 
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {formValues.confirmPassword === password ? (
+                            <Check className="h-3 w-3" />
+                          ) : (
+                            <span className="h-3 w-3 rounded-full border border-current"></span>
+                          )}
+                          {formValues.confirmPassword === password ? 'Passwords match' : 'Passwords do not match'}
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-xs text-gray-600 bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
