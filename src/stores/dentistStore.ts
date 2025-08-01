@@ -124,6 +124,11 @@ interface DentistState {
   
   // Service management
   fetchMyServices: () => Promise<void>;
+  
+  // Working Hours management
+  fetchWorkingHours: () => Promise<WorkingHours>;
+  updateWorkingHours: (workingHours: WorkingHours) => Promise<void>;
+  updateDayAvailability: (date: string, timeSlots: Array<{start: string, end: string, isAvailable: boolean}>) => Promise<void>;
 }
 
 export const useDentistStore = create<DentistState>((set, get) => ({

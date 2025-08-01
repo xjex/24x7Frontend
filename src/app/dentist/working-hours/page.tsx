@@ -177,8 +177,8 @@ export default function WorkingHoursPage() {
                 <ul className="space-y-1 list-disc list-inside">
                   <li>Set realistic working hours</li>
                   <li>Consider lunch breaks (1-2 PM gap)</li>
-                  <li>Use "Copy to All" for consistent schedules</li>
-                  <li>Mark non-working days as "Off"</li>
+                                  <li>Use &quot;Copy to All&quot; for consistent schedules</li>
+                <li>Mark non-working days as &quot;Off&quot;</li>
                 </ul>
               </div>
               
