@@ -19,7 +19,7 @@ This is a monorepo containing:
 
 1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone https://github.com/xjex/24x7-backend.git
 cd 24x7
 ```
 
