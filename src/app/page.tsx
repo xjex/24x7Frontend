@@ -1,12 +1,13 @@
 'use client'
 
 import Link from "next/link"
-
+import { useAuthStore } from "@/stores/authStore"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Calendar, Clock, Users, Award, Phone, MapPin } from "lucide-react"
+import { Calendar, Clock, Users, Award, Phone, MapPin, User, LogOut } from "lucide-react"
 
 export default function Home() {
+  const { user, isAuthenticated, logout } = useAuthStore()
   const services = [
     {
       title: "General Dentistry",
@@ -30,14 +31,39 @@ export default function Home() {
       <header className="container mx-auto px-4 py-6">
         <nav className="flex justify-between items-center">
           <div className="text-2xl font-bold text-dental-700 dark:text-dental-400">DentalCare+</div>
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/login">
-              <Button variant="outline">Login</Button>
-            </Link>
-            <Link href="/register">
-              <Button variant="dental">Register</Button>
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <span className="text-sm text-muted-foreground">
+                  Welcome, {user?.name}
+                </span>
+                <Link href="/dashboard">
+                  <Button variant="outline" size="sm">
+                    <User className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => logout()}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="outline">Login</Button>
+                </Link>
+                <Link href="/register">
+                  <Button variant="outline">Register</Button>
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       </header>
@@ -45,19 +71,31 @@ export default function Home() {
       <main>
         <section className="container mx-auto px-4 py-20 text-center">
           <h1 className="text-5xl font-bold text-foreground mb-6">
-            Your Smile is Our Priority
+            {isAuthenticated ? `Welcome back, ${user?.name?.split(' ')[0]}!` : 'Your Smile is Our Priority'}
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Modern dental care with state-of-the-art technology and compassionate service. 
-            Book your appointment today and experience the difference.
+            {isAuthenticated 
+              ? "Ready for your next appointment? Book now or manage your existing appointments through your dashboard."
+              : "Modern dental care with state-of-the-art technology and compassionate service. Book your appointment today and experience the difference."
+            }
           </p>
 
-          <Link href="/book">
-            <Button size="lg" variant="dental" className="text-lg px-8 py-4">
-              <Calendar className="mr-2 h-5 w-5" />
-              Book Appointment
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/book">
+              <Button size="lg" variant="default" className="text-lg px-8 py-4">
+                <Calendar className="mr-2 h-5 w-5" />
+                Book Appointment
+              </Button>
+            </Link>
+            {isAuthenticated && (
+              <Link href="/dashboard/appointments">
+                <Button size="lg" variant="outline" className="text-lg px-8 py-4">
+                  <User className="mr-2 h-5 w-5" />
+                  My Appointments
+                </Button>
+              </Link>
+            )}
+          </div>
         </section>
 
         <section className="container mx-auto px-4 py-16">
@@ -94,11 +132,19 @@ export default function Home() {
                   Book Your Visit Today
                 </Button>
               </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline" className="text-lg px-10 py-4 border-white text-white hover:bg-white hover:text-gray-900">
-                  Patient Portal
-                </Button>
-              </Link>
+              {isAuthenticated ? (
+                <Link href="/dashboard">
+                  <Button size="lg" variant="outline" className="text-lg px-10 py-4 border-2 border-white/80 text-white hover:bg-white hover:text-primary bg-transparent backdrop-blur-sm">
+                    Your Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/login">
+                  <Button size="lg" variant="outline" className="text-lg px-10 py-4 border-2 border-white/80 text-white hover:bg-white hover:text-primary bg-transparent backdrop-blur-sm">
+                    Patient Portal
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </section>

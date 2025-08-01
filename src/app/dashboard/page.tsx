@@ -1,29 +1,66 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuthStore } from '@/stores/authStore'
-import { useAppointmentStore } from '@/stores/appointmentStore'
+import { usePatientStore, type Appointment } from '@/stores/patientStore'
 import { Button } from '@/components/ui/button'
-
-import { ThemeToggle } from '@/components/theme-toggle'
-import { Calendar, Clock, User, Phone, Mail, MapPin, Plus, Edit, Trash2, LogOut } from 'lucide-react'
-import { format } from 'date-fns'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { 
+  Calendar, 
+  Clock, 
+  User, 
+  Plus, 
+  CalendarDays,
+  Stethoscope,
+  ArrowRight,
+  CheckCircle,
+  XCircle,
+  FileText
+} from 'lucide-react'
+import { format, parseISO, isToday, isTomorrow } from 'date-fns'
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const { user, logout, isAuthenticated } = useAuthStore()
-  const { appointments, fetchAppointments, cancelAppointment, isLoading } = useAppointmentStore()
+  const { user } = useAuthStore()
+  const { 
+    appointments, 
+    upcomingAppointments, 
+    fetchAppointments, 
+    fetchProfile,
+    cancelAppointment, 
+    isLoading 
+  } = usePatientStore()
 
+  const [stats, setStats] = useState<{
+    totalAppointments: number
+    upcomingAppointments: number
+    completedAppointments: number
+    nextAppointment: Appointment | null
+  }>({
+    totalAppointments: 0,
+    upcomingAppointments: 0,
+    completedAppointments: 0,
+    nextAppointment: null
+  })
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login')
-      return
-    }
     fetchAppointments()
-  }, [isAuthenticated, fetchAppointments, router])
+    fetchProfile()
+  }, [fetchAppointments, fetchProfile])
+
+  useEffect(() => {
+    if (appointments.length > 0) {
+      const completed = appointments.filter(apt => apt.status === 'completed').length
+      const nextApt = upcomingAppointments.length > 0 ? upcomingAppointments[0] : null
+      
+      setStats({
+        totalAppointments: appointments.length,
+        upcomingAppointments: upcomingAppointments.length,
+        completedAppointments: completed,
+        nextAppointment: nextApt
+      })
+    }
+  }, [appointments, upcomingAppointments])
 
   const handleCancelAppointment = async (appointmentId: string) => {
     if (window.confirm('Are you sure you want to cancel this appointment?')) {
@@ -35,256 +72,292 @@ export default function DashboardPage() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    router.push('/')
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800'
+      case 'pending':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
+      case 'confirmed':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
       case 'completed':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+      case 'no-show':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300'
     }
   }
 
-  const upcomingAppointments = (appointments || []).filter(apt => 
-    apt.status === 'scheduled' && new Date(apt.date) >= new Date()
-  )
-  
-  const pastAppointments = (appointments || []).filter(apt => 
-    apt.status === 'completed' || new Date(apt.date) < new Date()
-  )
-
-  if (!user) {
-    return <div>Loading...</div>
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'No date'
+    try {
+      const date = parseISO(dateString)
+      if (isToday(date)) return 'Today'
+      if (isTomorrow(date)) return 'Tomorrow'
+      return format(date, 'MMM d, yyyy')
+    } catch {
+      return 'Invalid date'
+    }
   }
 
   return (
-    <div className="min-h-screen page-background">
-      <header className="gradient-bg-primary shadow-lg">
-        <div className="container mx-auto px-4 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="text-xl sm:text-2xl font-bold text-white">DentalCare+</div>
-              <span className="text-white/70 hidden sm:inline">|</span>
-              <span className="text-white/90 font-medium text-sm sm:text-base hidden sm:inline">Patient Dashboard</span>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <span className="text-white/90 font-medium text-sm sm:text-base order-2 sm:order-1">
-                Welcome, {user.firstName}
-              </span>
-              <div className="flex items-center gap-3 order-1 sm:order-2">
-                <ThemeToggle />
-                <Button variant="outline" onClick={handleLogout} className="bg-white/20 border-white/30 text-white hover:bg-white hover:text-gray-900 text-sm sm:text-base px-3 sm:px-4">
-                  <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Logout</span>
-                  <span className="sm:hidden">Exit</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Welcome back, {user?.name}!
+        </h1>
+        <p className="text-gray-600 dark:text-gray-300">
+          Here&apos;s your dental care overview
+        </p>
+      </div>
 
-      <main className="container mx-auto px-4 py-6 sm:py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10">
-          <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-            <div className="flex flex-col gap-4">
-              <div className="text-center sm:text-left">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-2">My Appointments</h1>
-                <p className="text-base sm:text-lg text-muted-foreground">Manage your dental appointments and health records</p>
-              </div>
-              <Link href="/book" className="w-full sm:w-auto sm:self-start">
-                <Button variant="dental" className="w-full sm:w-auto px-6 py-3 sm:px-8 sm:py-4 text-base sm:text-lg">
-                  <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  Book New Appointment
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Appointments</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalAppointments}</div>
+            <p className="text-xs text-muted-foreground">
+              All time appointments
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.upcomingAppointments}</div>
+            <p className="text-xs text-muted-foreground">
+              Scheduled appointments
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.completedAppointments}</div>
+            <p className="text-xs text-muted-foreground">
+              Finished treatments
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Next Visit</CardTitle>
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {stats.nextAppointment ? formatDate(stats.nextAppointment.date) : 'None'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.nextAppointment ? stats.nextAppointment.time : 'No upcoming appointments'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Quick Book
+            </CardTitle>
+            <CardDescription>
+              Schedule your next dental appointment
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+                            <Link href="/book">
+              <Button className="w-full">
+                Book Appointment
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              My Appointments
+            </CardTitle>
+            <CardDescription>
+              View and manage your appointments
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/dashboard/appointments">
+              <Button variant="outline" className="w-full">
+                View Appointments
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              My Profile
+            </CardTitle>
+            <CardDescription>
+              Update your personal information
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/dashboard/profile">
+              <Button variant="outline" className="w-full">
+                Edit Profile
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Upcoming Appointments */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Upcoming Appointments
+              </span>
+              <Link href="/dashboard/appointments">
+                <Button variant="outline" size="sm">
+                  View All
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </Link>
-            </div>
-
+            </CardTitle>
+            <CardDescription>
+              Your next scheduled visits
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             {isLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-dental-500 mx-auto mb-4"></div>
-                <div className="text-muted-foreground text-lg">Loading appointments...</div>
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <div className="text-muted-foreground">Loading appointments...</div>
+              </div>
+            ) : upcomingAppointments.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">No upcoming appointments</p>
+                <Link href="/book">
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Book Your First Appointment
+                  </Button>
+                </Link>
               </div>
             ) : (
-              <>
-                <section>
-                  <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">Upcoming Appointments</h2>
-                  {upcomingAppointments.length === 0 ? (
-                    <div className="pretty-card p-6 sm:p-12 text-center">
-                      <Calendar className="h-12 w-12 sm:h-16 sm:w-16 text-dental-400 mx-auto mb-4 sm:mb-6" />
-                      <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">No upcoming appointments</h3>
-                      <p className="text-muted-foreground mb-4 sm:mb-6 text-base sm:text-lg">Start your journey to better dental health</p>
-                      <Link href="/book">
-                        <Button variant="dental" className="w-full sm:w-auto px-6 py-3 sm:px-8 sm:py-4 text-base sm:text-lg">Schedule Your First Appointment</Button>
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 sm:space-y-6">
-                      {upcomingAppointments.map((appointment) => (
-                        <div key={appointment.id} className="pretty-card p-4 sm:p-8">
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0 mb-4 sm:mb-6">
-                            <div className="flex-1">
-                              <h3 className="text-lg sm:text-2xl font-bold text-foreground mb-1 sm:mb-2">
-                                {appointment.service}
-                              </h3>
-                              <p className="text-sm sm:text-lg text-muted-foreground">
-                                Dr. {appointment.dentist?.firstName} {appointment.dentist?.lastName}
-                              </p>
-                              <p className="text-xs sm:text-base text-muted-foreground sm:hidden">
-                                {appointment.dentist?.specialization}
-                              </p>
-                              <p className="hidden sm:block text-lg text-muted-foreground">
-                                {appointment.dentist?.specialization}
-                              </p>
-                            </div>
-                            <span className={`px-3 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-full self-start ${getStatusColor(appointment.status)}`}>
-                              {appointment.status}
-                            </span>
+              <div className="space-y-4">
+                {upcomingAppointments.slice(0, 3).map((appointment) => (
+                  <div key={appointment._id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-medium">
+                            {appointment.dentistId?.name || 'Dr. Unknown'}
+                          </h3>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(appointment.status)}`}>
+                            {appointment.status}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {appointment.serviceId?.name || 'General Consultation'}
+                        </p>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(appointment.date)}
                           </div>
-                          <div className="flex flex-col gap-2 mb-4 sm:mb-6">
-                            <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
-                              <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-dental-500" />
-                              <span className="font-medium text-sm sm:text-base">{format(new Date(appointment.date), 'EEE, MMM d, yyyy')}</span>
-                            </div>
-                            <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
-                              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-dental-500" />
-                              <span className="font-medium text-sm sm:text-base">{appointment.time}</span>
-                            </div>
-                          </div>
-                          {appointment.notes && (
-                            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-                              <p className="text-foreground text-sm sm:text-base">
-                                <strong className="text-dental-600">Notes:</strong> {appointment.notes}
-                              </p>
-                            </div>
-                          )}
-                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                            <Link href={`/appointments/${appointment.id}/reschedule`} className="flex-1 sm:flex-none">
-                              <Button variant="outline" className="w-full sm:w-auto bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 text-sm sm:text-base">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Reschedule
-                              </Button>
-                            </Link>
-                            <Button 
-                              variant="outline" 
-                              onClick={() => handleCancelAppointment(appointment.id)}
-                              className="w-full sm:w-auto bg-red-50 border-red-200 text-red-700 hover:bg-red-100 text-sm sm:text-base"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Cancel
-                            </Button>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {appointment.time || 'No time'}
                           </div>
                         </div>
-                      ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCancelAppointment(appointment._id)}
+                      >
+                        <XCircle className="h-3 w-3" />
+                      </Button>
                     </div>
-                  )}
-                </section>
-
-                {pastAppointments.length > 0 && (
-                  <section>
-                    <h2 className="text-2xl font-bold text-foreground mb-6">Appointment History</h2>
-                    <div className="space-y-4">
-                      {pastAppointments.slice(0, 3).map((appointment) => (
-                        <div key={appointment.id} className="pretty-card p-6 opacity-90">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-semibold text-lg text-foreground">{appointment.service}</h3>
-                              <p className="text-muted-foreground">
-                                Dr. {appointment.dentist?.firstName} {appointment.dentist?.lastName}
-                              </p>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                                <span>{format(new Date(appointment.date), 'MMM d, yyyy')}</span>
-                                <span>{appointment.time}</span>
-                              </div>
-                            </div>
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(appointment.status)}`}>
-                              {appointment.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-              </>
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-6 lg:space-y-8">
-            <div className="pretty-card p-6 sm:p-8">
-              <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <User className="h-5 w-5 sm:h-6 sm:w-6 text-dental-500" />
-                <h2 className="text-xl sm:text-2xl font-bold text-foreground">Profile Information</h2>
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Recent Activity
+            </CardTitle>
+            <CardDescription>
+              Your treatment history
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {appointments.filter(apt => apt.status === 'completed').length === 0 ? (
+              <div className="text-center py-8">
+                <Stethoscope className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No treatment history yet</p>
               </div>
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex items-center gap-3">
-                  <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-dental-500 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base break-all">{user.email}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-dental-500 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">{user.phone || 'Not provided'}</span>
-                </div>
-                {user.address && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-dental-500 mt-0.5 flex-shrink-0" />
-                    <div className="text-foreground text-sm sm:text-base">
-                      <div>{user.address.street}</div>
-                      <div>{user.address.city}, {user.address.state} {user.address.zipCode}</div>
+            ) : (
+              <div className="space-y-4">
+                {appointments
+                  .filter(apt => apt.status === 'completed')
+                  .slice(0, 3)
+                  .map((appointment) => (
+                    <div key={appointment._id} className="border-l-4 border-green-500 pl-4 py-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium">
+                            {appointment.serviceId?.name || 'General Consultation'}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            with {appointment.dentistId?.name || 'Dr. Unknown'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(appointment.date)} at {appointment.time || 'No time'}
+                          </p>
+                        </div>
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      </div>
                     </div>
-                  </div>
-                )}
-                <Button variant="outline" className="w-full mt-4 sm:mt-6 bg-dental-50 border-dental-200 text-dental-700 hover:bg-dental-100 text-sm sm:text-base py-2 sm:py-3">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Profile
-                </Button>
+                  ))}
               </div>
-            </div>
-
-            <div className="pretty-card p-6 sm:p-8">
-              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">Emergency Contact</h2>
-              {user.emergencyContact ? (
-                <div className="space-y-3">
-                  <div className="text-base sm:text-lg font-semibold text-foreground">{user.emergencyContact.name}</div>
-                  <div className="text-sm sm:text-base text-muted-foreground">{user.emergencyContact.relationship}</div>
-                  <div className="flex items-center gap-3">
-                    <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-dental-500 flex-shrink-0" />
-                    <span className="text-foreground text-sm sm:text-base">{user.emergencyContact.phone}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm sm:text-base">No emergency contact on file</p>
-              )}
-            </div>
-
-            <div className="pretty-card p-6 sm:p-8">
-              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">Quick Actions</h2>
-              <div className="space-y-3 sm:space-y-4">
-                <Link href="/book">
-                  <Button variant="outline" className="w-full py-3 sm:py-4 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 text-sm sm:text-base">
-                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3" />
-                    Book Appointment
-                  </Button>
-                </Link>
-                <Link href="/contact">
-                  <Button variant="outline" className="w-full py-3 sm:py-4 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 text-sm sm:text-base">
-                    <Phone className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3" />
-                    Contact Office
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
-} 
+}

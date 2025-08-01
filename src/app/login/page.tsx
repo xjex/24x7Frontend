@@ -27,8 +27,8 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     try {
       setError('')
-      await login(data.email, data.password)
-      router.push('/dashboard')
+      const { redirectTo } = await login(data.email, data.password)
+      router.push(redirectTo)
     } catch (err: unknown) {
       setError((err as {response?: {data?: {message?: string}}})?.response?.data?.message || 'Login failed. Please try again.')
     }
@@ -112,7 +112,7 @@ export default function LoginPage() {
             <Button 
               type="submit" 
               className="w-full py-4 text-lg font-semibold" 
-              variant="dental"
+              variant="default"
               disabled={isLoading}
             >
               {isLoading ? 'Signing in...' : 'Sign In'}

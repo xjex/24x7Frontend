@@ -4,22 +4,26 @@ import api from '@/lib/axios'
 
 export interface User {
   id: string
+  name: string
   email: string
-  firstName: string
-  lastName: string
-  phone?: string
-  role: 'patient' | 'dentist' | 'admin'
-  dateOfBirth?: string
-  address?: {
-    street: string
-    city: string
-    state: string
-    zipCode: string
-  }
-  emergencyContact?: {
-    name: string
-    phone: string
-    relationship: string
+  role: 'patient' | 'admin' | 'dentist'
+  isActive: boolean
+  profile?: {
+    phone?: string
+    birthdate?: string
+    gender?: string
+    address?: string
+    emergencyContact?: {
+      name: string
+      phone: string
+      relationship: string
+    }
+    medicalHistory?: {
+      allergies?: string[]
+      medications?: string[]
+      conditions?: string[]
+      notes?: string
+    }
   }
 }
 
@@ -27,10 +31,14 @@ interface AuthState {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (userData: Omit<User, 'id' | 'role'> & { password: string }) => Promise<void>
+  isInitialized: boolean
+  login: (email: string, password: string) => Promise<{ redirectTo: string }>
+  register: (userData: { name: string; email: string; password: string; phone: string; birthdate: string; gender: string; address: string }) => Promise<void>
   logout: () => void
   updateProfile: (userData: Partial<User>) => Promise<void>
+  getRoleBasedRedirect: (role: string) => string
+  initializeAuth: () => Promise<void>
+  clearAuth: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -39,6 +47,20 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      isInitialized: false,
+
+      getRoleBasedRedirect: (role: string) => {
+        switch (role) {
+          case 'admin':
+            return '/admin/dashboard'
+          case 'dentist':
+            return '/dentist/dashboard'
+          case 'patient':
+            return '/dashboard'
+          default:
+            return '/dashboard'
+        }
+      },
 
       login: async (email: string, password: string) => {
         try {
@@ -48,6 +70,21 @@ export const useAuthStore = create<AuthState>()(
           
           localStorage.setItem('token', token)
           set({ user, isAuthenticated: true })
+          
+          const redirectTo = (() => {
+            switch (user.role) {
+              case 'admin':
+                return '/admin/dashboard'
+              case 'dentist':
+                return '/dentist/dashboard'
+              case 'patient':
+                return '/dashboard'
+              default:
+                return '/dashboard'
+            }
+          })()
+          
+          return { redirectTo }
         } catch (error) {
           console.error('Login failed:', error)
           throw error
@@ -75,6 +112,32 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('token')
         set({ user: null, isAuthenticated: false })
+      },
+
+      clearAuth: () => {
+        localStorage.removeItem('token')
+        set({ user: null, isAuthenticated: false, isInitialized: true })
+      },
+
+      initializeAuth: async () => {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          set({ isInitialized: true })
+          return
+        }
+
+        try {
+          set({ isLoading: true })
+          const response = await api.get('/auth/me')
+          const { user } = response.data
+          set({ user, isAuthenticated: true, isInitialized: true })
+        } catch (error) {
+          console.error('Auth initialization failed:', error)
+          localStorage.removeItem('token')
+          set({ user: null, isAuthenticated: false, isInitialized: true })
+        } finally {
+          set({ isLoading: false })
+        }
       },
 
       updateProfile: async (userData) => {
